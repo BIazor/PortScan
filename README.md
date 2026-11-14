@@ -1,6 +1,6 @@
 # scanwatch
 
-A small Python tool that reads a packet capture (a `.pcap` file — basically a
+A small Python tool that reads a packet capture (a `.pcap` file, meaning a
 recording of network traffic) and tells you whether someone was **probing your
 network for open ports**.
 
@@ -36,7 +36,7 @@ traffic : 825 packets (TCP 825, UDP 0, ICMP 0) in 0.14s
 ```
 
 Notice the last block. "408 SYN packets, none of them finished a connection"
-is not a guess — it is a specific, checkable fact about the traffic, and that is
+is not a guess. It is a specific, checkable fact about the traffic, and that is
 what the verdict is built on.
 
 ## Why I built it
@@ -46,8 +46,8 @@ tool everyone tells you to run, but far fewer people can explain what its
 packets actually look like on the wire, or how you would spot them if you were
 on the defending side. So I wrote my own detector, then pointed real Nmap at a
 machine, captured the traffic, and checked that my detector got the answer
-right. That comparison — expecting a technique, and seeing the tool name it
-correctly — is the part I care most about, and it is in the repo as a script
+right. That comparison, expecting a technique and then seeing the tool name it
+correctly, is the part I care most about, and it is in the repo as a script
 you can re-run yourself.
 
 ## Background, if you are new to this
@@ -86,7 +86,7 @@ tell them apart: it is not guessing from timing, it is reading the flags.
 | Version detection | `-sV` | sends real application data after connecting, on several ports | how many ports got probe data |
 | OS fingerprinting | `-O` | deliberately invalid flag combos (`SYN+FIN`, `SYN+RST`, odd ECN packets) | the exact combos seen |
 | Host sweep | `-sn` | ICMP echo/timestamp to many machines | how many hosts, and which |
-| Horizontal sweep | — | the *same* port probed across many machines | the port, host count, samples |
+| Horizontal sweep | n/a | the *same* port probed across many machines | the port, host count, samples |
 
 Every finding comes with a `confidence` score (how much evidence there is, how
 clean the pattern is, and whether the target answered at all) and a `severity`
@@ -110,7 +110,7 @@ pcap/pcapng ──► pcapio ──► tracker ──► detectors ──► rep
    long idle gap, and keeps per-port state: did we see `SYN`, did we see a
    `SYN+ACK`, did the handshake finish, did someone send `RST`, did the scanner
    send data afterwards. Keeping *probes* separate from *responses* is the whole
-   trick — it is what stops normal web browsing from looking like a scan.
+   trick: it is what stops normal web browsing from looking like a scan.
 3. **`scanwatch/detectors.py`** holds one small rule per technique and merges
    duplicate hits for the same flow into a single finding.
 4. **`scanwatch/report.py`** and **`cli.py`** print the result, either as nicely
@@ -129,7 +129,7 @@ pip install pytest
 Analysing captures is pure Python, so it works on Windows, macOS and Linux.
 
 Running the live lab (further down) is a different story: it captures packets
-from the machine it runs on, which on Windows means **Npcap** — that ships with
+from the machine it runs on, which on Windows means **Npcap**. That ships with
 the Nmap Windows installer, so installing Nmap usually gets you both.
 
 ## Usage
@@ -162,7 +162,7 @@ python -m scanwatch analyze capture.pcap --min-ports 30 --session-gap 60
 
 The JSON output contains `title`, `technique`, `severity`, `confidence`,
 `scanner`, `target`, `ports`, `sessions`, `start`, `end` and the `evidence`
-lines — the same information as the text report.
+lines, the same information as the text report.
 
 ## Checking it against real Nmap traffic
 
@@ -180,7 +180,7 @@ To give the scans something to find, the script starts eight small fake
 services on ports 20001–20008. That matters for `-sT` (cancel scans need open
 ports to connect to) and for `-sV` (version detection has to have something to
 talk to). The fake services reply with a banner Nmap cannot identify, which
-keeps it probing and actually sending its payload — with a real-looking SSH or
+keeps it probing and actually sending its payload. With a real-looking SSH or
 HTTP banner, Nmap recognises the service immediately and sends nothing, and the
 test ends up proving very little.
 
@@ -226,8 +226,8 @@ python -m scanwatch synth samples
 
 This writes 15 labelled captures that reproduce the same packet signatures,
 plus `samples/labels.json` telling you what each one should produce. Three of
-them are ordinary traffic — a web session, DNS lookups and some UDP service
-discovery — and should produce **no** findings at all. Those exist to catch a
+them are ordinary traffic (a web session, DNS lookups and some UDP service
+discovery) and should produce **no** findings at all. Those exist to catch a
 detector that flags everything.
 
 These files are **synthetic**. They are convenient for testing on any machine,
@@ -256,7 +256,7 @@ I would rather list these than have someone find them the hard way.
   to one service, so it is not flagged. It takes probes to 3+ ports.
 - **UDP scanning** is judged by how many ports get hit. That bar is 25, because
   ordinary background traffic (service discovery, mDNS-style chatter) produces
-  short bursts that should not be called an attack — I saw exactly that happen
+  short bursts that should not be called an attack. I saw exactly that happen
   during testing at a threshold of 10. Real `-sU` runs touch hundreds of ports,
   so there is plenty of margin; lower `--min-udp-ports` if you need to catch
   tiny sweeps and can tolerate more noise.
