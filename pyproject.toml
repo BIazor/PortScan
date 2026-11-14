@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scanwatch"
+version = "1.0.0"
+description = "Detect Nmap reconnaissance techniques in pcap captures with DPKT"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["dpkt>=1.9"]
+keywords = ["pcap", "nmap", "network-security", "reconnaissance", "dpkt"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Networking :: Monitoring",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/BIazor/PortScan"
+Issues = "https://github.com/BIazor/PortScan/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+scanwatch = "scanwatch.cli:main"
+
+[tool.setuptools]
+packages = ["scanwatch"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

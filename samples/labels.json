@@ -1,0 +1,101 @@
+{
+  "ack_scan": {
+    "title": "ACK firewall-mapping scan",
+    "expected": [
+      "ack"
+    ],
+    "path": "ack_scan.pcap"
+  },
+  "benign_dns": {
+    "title": "Normal DNS lookups",
+    "expected": [],
+    "path": "benign_dns.pcap"
+  },
+  "benign_udp_discovery": {
+    "title": "UDP service discovery across 10 ports",
+    "expected": [],
+    "path": "benign_udp_discovery.pcap"
+  },
+  "benign_web": {
+    "title": "Normal HTTP browsing",
+    "expected": [],
+    "path": "benign_web.pcap"
+  },
+  "connect_scan": {
+    "title": "Connect scan with completed handshakes",
+    "expected": [
+      "connect"
+    ],
+    "path": "connect_scan.pcap"
+  },
+  "fin_scan": {
+    "title": "FIN scan",
+    "expected": [
+      "fin"
+    ],
+    "path": "fin_scan.pcap"
+  },
+  "host_sweep": {
+    "title": "Ping sweep over 12 hosts",
+    "expected": [
+      "host_sweep"
+    ],
+    "path": "host_sweep.pcap"
+  },
+  "maimon_scan": {
+    "title": "Maimon (FIN+ACK) scan",
+    "expected": [
+      "maimon"
+    ],
+    "path": "maimon_scan.pcap"
+  },
+  "null_scan": {
+    "title": "NULL scan",
+    "expected": [
+      "null"
+    ],
+    "path": "null_scan.pcap"
+  },
+  "os_fingerprint": {
+    "title": "OS fingerprint probes",
+    "expected": [
+      "os_fingerprint"
+    ],
+    "path": "os_fingerprint.pcap"
+  },
+  "port_sweep": {
+    "title": "Horizontal sweep of port 445",
+    "expected": [
+      "port_sweep"
+    ],
+    "path": "port_sweep.pcap"
+  },
+  "syn_scan": {
+    "title": "Half-open SYN scan of 300 ports",
+    "expected": [
+      "syn"
+    ],
+    "path": "syn_scan.pcap"
+  },
+  "udp_scan": {
+    "title": "UDP scan with port-unreachable replies",
+    "expected": [
+      "udp"
+    ],
+    "path": "udp_scan.pcap"
+  },
+  "version_scan": {
+    "title": "Service/version detection",
+    "expected": [
+      "version"
+    ],
+    "path": "version_scan.pcap"
+  },
+  "xmas_scan": {
+    "title": "XMAS scan",
+    "expected": [
+      "xmas"
+    ],
+    "path": "xmas_scan.pcap"
+  }
+}

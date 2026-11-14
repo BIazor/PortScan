@@ -1,0 +1,408 @@
+{
+  "target": "127.0.0.1",
+  "device": "\\Device\\NPF_Loopback",
+  "nmap": "C:\\Program Files (x86)\\Nmap\\nmap.EXE",
+  "min_ports": 15,
+  "scenarios": [
+    {
+      "scenario": "syn_scan",
+      "description": "half-open SYN sweep, RST+ACK from closed ports",
+      "nmap_args": [
+        "-sS",
+        "-p",
+        "1-400,20001-20008",
+        "--min-rate",
+        "800"
+      ],
+      "expected": [
+        "syn"
+      ],
+      "detected": [
+        "syn"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.99,
+      "packets": 827,
+      "scan_seconds": 0.58,
+      "capture": "captures\\real\\syn_scan.pcap",
+      "nmap_log": "captures\\real\\syn_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "syn",
+          "severity": "high",
+          "confidence": 0.99,
+          "ports": 408,
+          "evidence": [
+            "408/409 TCP probes carried a bare SYN and never completed a handshake",
+            "407/408 probes drew a response (9 SYN+ACK, 398 RST)",
+            "constant TCP window 1024 on every SYN (Nmap's default)",
+            "fan-out rate 2631 probes/s over 0.16s"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "connect_scan",
+      "description": "full connect() sweep, handshakes on the listening ports",
+      "nmap_args": [
+        "-sT",
+        "-p",
+        "1-400,20001-20008",
+        "--min-rate",
+        "800"
+      ],
+      "expected": [
+        "connect"
+      ],
+      "detected": [
+        "connect"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.99,
+      "packets": 848,
+      "scan_seconds": 0.1,
+      "capture": "captures\\real\\connect_scan.pcap",
+      "nmap_log": "captures\\real\\connect_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "connect",
+          "severity": "high",
+          "confidence": 0.99,
+          "ports": 9,
+          "evidence": [
+            "9 of 407 probed ports completed a full 3-way handshake and were closed without sending data",
+            "listening ports: 135, 20001, 20002, 20003, 20004, 20005, 20006, 20007, 20008"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "fin_scan",
+      "description": "bare FIN segments",
+      "nmap_args": [
+        "-sF",
+        "-p",
+        "1-400,20001-20008",
+        "--min-rate",
+        "800"
+      ],
+      "expected": [
+        "fin"
+      ],
+      "detected": [
+        "fin"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.9,
+      "packets": 818,
+      "scan_seconds": 1.84,
+      "capture": "captures\\real\\fin_scan.pcap",
+      "nmap_log": "captures\\real\\fin_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "fin",
+          "severity": "high",
+          "confidence": 0.9,
+          "ports": 408,
+          "evidence": [
+            "408 bare FIN segments sent to closed ports (nmap -sF)",
+            "no responses observed (filtered or local target)",
+            "ports: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 (+396 more)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "xmas_scan",
+      "description": "FIN+PSH+URG probes",
+      "nmap_args": [
+        "-sX",
+        "-p",
+        "1-400,20001-20008",
+        "--min-rate",
+        "800"
+      ],
+      "expected": [
+        "xmas"
+      ],
+      "detected": [
+        "xmas"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.9,
+      "packets": 820,
+      "scan_seconds": 1.85,
+      "capture": "captures\\real\\xmas_scan.pcap",
+      "nmap_log": "captures\\real\\xmas_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "xmas",
+          "severity": "high",
+          "confidence": 0.9,
+          "ports": 408,
+          "evidence": [
+            "408 probes used the 'Christmas tree' FIN+PSH+URG combination (nmap -sX)",
+            "no responses observed (filtered or local target)",
+            "ports: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 (+396 more)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "null_scan",
+      "description": "TCP segments with no flags",
+      "nmap_args": [
+        "-sN",
+        "-p",
+        "1-400,20001-20008",
+        "--min-rate",
+        "800"
+      ],
+      "expected": [
+        "null"
+      ],
+      "detected": [
+        "null"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.9,
+      "packets": 816,
+      "scan_seconds": 1.85,
+      "capture": "captures\\real\\null_scan.pcap",
+      "nmap_log": "captures\\real\\null_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "null",
+          "severity": "high",
+          "confidence": 0.9,
+          "ports": 408,
+          "evidence": [
+            "408 TCP segments had no flags set at all (nmap -sN)",
+            "no responses observed (filtered or local target)",
+            "ports: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 (+396 more)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "ack_scan",
+      "description": "ACK-only firewall mapping",
+      "nmap_args": [
+        "-sA",
+        "-p",
+        "1-400,20001-20008",
+        "--min-rate",
+        "800"
+      ],
+      "expected": [
+        "ack"
+      ],
+      "detected": [
+        "ack"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.99,
+      "packets": 820,
+      "scan_seconds": 0.51,
+      "capture": "captures\\real\\ack_scan.pcap",
+      "nmap_log": "captures\\real\\ack_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "ack",
+          "severity": "high",
+          "confidence": 0.99,
+          "ports": 410,
+          "evidence": [
+            "410 ACK-only segments to ports with no prior handshake (nmap -sA firewall mapping)",
+            "407/410 probes answered (RST from closed ports)",
+            "ports: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 (+398 more)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "maimon_scan",
+      "description": "FIN+ACK probes",
+      "nmap_args": [
+        "-sM",
+        "-p",
+        "1-400,20001-20008",
+        "--min-rate",
+        "800"
+      ],
+      "expected": [
+        "maimon"
+      ],
+      "detected": [
+        "maimon"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.99,
+      "packets": 818,
+      "scan_seconds": 0.6,
+      "capture": "captures\\real\\maimon_scan.pcap",
+      "nmap_log": "captures\\real\\maimon_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "maimon",
+          "severity": "high",
+          "confidence": 0.99,
+          "ports": 408,
+          "evidence": [
+            "408 FIN+ACK segments to ports with no prior handshake (nmap -sM)",
+            "407/408 probes answered (RST from closed ports)",
+            "ports: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 (+396 more)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "udp_scan",
+      "description": "UDP datagrams, ICMP port-unreachable for closed ports",
+      "nmap_args": [
+        "-sU",
+        "--top-ports",
+        "60",
+        "--min-rate",
+        "300"
+      ],
+      "expected": [
+        "udp"
+      ],
+      "detected": [
+        "udp"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.9,
+      "packets": 168,
+      "scan_seconds": 1.6,
+      "capture": "captures\\real\\udp_scan.pcap",
+      "nmap_log": "captures\\real\\udp_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "udp",
+          "severity": "medium",
+          "confidence": 0.9,
+          "ports": 60,
+          "evidence": [
+            "60 UDP datagrams sent to distinct ports in 1.55s",
+            "no ICMP unreachable replies observed (filtered or local target)",
+            "ports: 7, 9, 19, 53, 67, 68, 69, 80, 111, 123, 135, 136 (+48 more)"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "version_scan",
+      "description": "service probes over completed handshakes",
+      "nmap_args": [
+        "-sV",
+        "-p",
+        "20001,20002,20003,20004,20005,20006,20007,20008",
+        "--version-intensity",
+        "2"
+      ],
+      "expected": [
+        "version"
+      ],
+      "detected": [
+        "version"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.99,
+      "packets": 465,
+      "scan_seconds": 10.64,
+      "capture": "captures\\real\\version_scan.pcap",
+      "nmap_log": "captures\\real\\version_scan.nmap.txt",
+      "findings": [
+        {
+          "technique": "version",
+          "severity": "low",
+          "confidence": 0.99,
+          "ports": 8,
+          "evidence": [
+            "8 ports received application data after a completed handshake",
+            "1760 bytes in 32 probe segment(s)",
+            "ports: 20001, 20002, 20003, 20004, 20005, 20006, 20007, 20008"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "os_fingerprint",
+      "description": "illegal flag combinations from OS detection (plus its SYN port scan)",
+      "nmap_args": [
+        "-O",
+        "--osscan-limit",
+        "-p",
+        "1-400,20001-20008"
+      ],
+      "expected": [
+        "os_fingerprint",
+        "syn"
+      ],
+      "detected": [
+        "os_fingerprint",
+        "syn"
+      ],
+      "missing": [],
+      "extra": [],
+      "verdict": "PASS",
+      "confidence": 0.99,
+      "packets": 943,
+      "scan_seconds": 5.94,
+      "capture": "captures\\real\\os_fingerprint.pcap",
+      "nmap_log": "captures\\real\\os_fingerprint.nmap.txt",
+      "findings": [
+        {
+          "technique": "syn",
+          "severity": "high",
+          "confidence": 0.99,
+          "ports": 408,
+          "evidence": [
+            "408/410 TCP probes carried a bare SYN and never completed a handshake",
+            "407/408 probes drew a response (23 SYN+ACK, 404 RST)",
+            "fan-out rate 67 probes/s over 6.05s"
+          ]
+        },
+        {
+          "technique": "os_fingerprint",
+          "severity": "high",
+          "confidence": 0.43,
+          "ports": 1,
+          "evidence": [
+            "1 probe(s) used flag combinations a normal TCP stack never emits: FIN+SYN+PSH+URG, NULL, SYN, SYN+ECE+CWR",
+            "ports: 135"
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "passed": 10,
+    "total": 10,
+    "recall": 1.0,
+    "precision": 1.0,
+    "detected_techniques": 11,
+    "expected_techniques": 11,
+    "extra_findings": 0
+  }
+}

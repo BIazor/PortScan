@@ -1,0 +1,20 @@
+$ C:\Program Files (x86)\Nmap\nmap.EXE -Pn -n -T4 --max-retries 1 -sS -p 1-400,20001-20008 --min-rate 800 127.0.0.1
+
+Starting Nmap 7.98 ( https://nmap.org ) at 2026-11-13 18:12 -0600
+Nmap scan report for 127.0.0.1
+Host is up (0.00s latency).
+Not shown: 398 closed tcp ports (reset)
+PORT      STATE    SERVICE
+135/tcp   open     msrpc
+137/tcp   filtered netbios-ns
+20001/tcp open     microsan
+20002/tcp open     commtact-http
+20003/tcp open     commtact-https
+20004/tcp open     unknown
+20005/tcp open     btx
+20006/tcp open     unknown
+20007/tcp open     unknown
+20008/tcp open     unknown
+
+Nmap done: 1 IP address (1 host up) scanned in 0.51 seconds
+

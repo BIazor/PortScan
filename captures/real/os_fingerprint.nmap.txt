@@ -1,0 +1,27 @@
+$ C:\Program Files (x86)\Nmap\nmap.EXE -Pn -n -T4 --max-retries 1 -O --osscan-limit -p 1-400,20001-20008 127.0.0.1
+
+Starting Nmap 7.98 ( https://nmap.org ) at 2026-11-13 18:12 -0600
+Nmap scan report for 127.0.0.1
+Host is up (0.000018s latency).
+Not shown: 398 closed tcp ports (reset)
+PORT      STATE    SERVICE
+135/tcp   open     msrpc
+137/tcp   filtered netbios-ns
+20001/tcp open     microsan
+20002/tcp open     commtact-http
+20003/tcp open     commtact-https
+20004/tcp open     unknown
+20005/tcp open     btx
+20006/tcp open     unknown
+20007/tcp open     unknown
+20008/tcp open     unknown
+Device type: specialized
+Running (JUST GUESSING): Microsoft Windows 10 (85%)
+OS CPE: cpe:/o:microsoft:windows_10
+Aggressive OS guesses: Microsoft Windows 10 1511 (85%)
+No exact OS matches for host (test conditions non-ideal).
+Network Distance: 0 hops
+
+OS detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 5.82 seconds
+
