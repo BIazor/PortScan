@@ -1,11 +1,19 @@
 # scanwatch
 
-PCAP analysis tool that detects **network reconnaissance** — specifically Nmap port
-scans — using **DPKT** for packet decoding and TCP flag / handshake analysis for
-classification.
+A small Python tool that reads a packet capture (a `.pcap` file — basically a
+recording of network traffic) and tells you whether someone was **probing your
+network for open ports**.
 
-It answers one question well: *given a capture, which Nmap scan techniques were
-used, against whom, and what is the packet-level evidence?*
+When an attacker (or a pentester, or a curious admin) wants in, the first thing
+they usually do is knock on lots of doors to see which ones are unlocked. That
+is called **reconnaissance**, and the most common way to do it is a **port
+scan**, usually with a tool called [Nmap](https://nmap.org). A port scan sends
+slightly unusual packets to hundreds of ports on one or many machines, and those
+packets leave a pattern behind.
+
+scanwatch finds those patterns. You give it a capture, and it tells you which
+Nmap scan technique was used, who was scanning whom, and which packets gave it
+away.
 
 ```
 $ python -m scanwatch analyze captures/real/syn_scan.pcap
@@ -27,25 +35,63 @@ traffic : 825 packets (TCP 825, UDP 0, ICMP 0) in 0.14s
       - fan-out rate 2979 probes/s over 0.14s
 ```
 
+Notice the last block. "408 SYN packets, none of them finished a connection"
+is not a guess — it is a specific, checkable fact about the traffic, and that is
+what the verdict is built on.
+
+## Why I built it
+
+I am fairly new to security and I learn best by taking things apart. Nmap is a
+tool everyone tells you to run, but far fewer people can explain what its
+packets actually look like on the wire, or how you would spot them if you were
+on the defending side. So I wrote my own detector, then pointed real Nmap at a
+machine, captured the traffic, and checked that my detector got the answer
+right. That comparison — expecting a technique, and seeing the tool name it
+correctly — is the part I care most about, and it is in the repo as a script
+you can re-run yourself.
+
+## Background, if you are new to this
+
+Feel free to skip this section if you already know TCP.
+
+- **TCP** is the protocol behind most traffic you care about (web, SSH, email).
+  It starts every conversation with a three-step greeting called the
+  **handshake**: your machine sends `SYN` ("can we talk?"), the server replies
+  `SYN+ACK` ("yes, go ahead"), and you send `ACK` ("great, talking now").
+- If the port is closed, the server replies `RST` instead ("no, go away").
+  So `SYN` followed by `RST` means *closed*, and `SYN` followed by `SYN+ACK`
+  means *open*. That is the whole basis of port scanning.
+- A normal client completes the handshake and then says something useful. A
+  scanner often sends the first packet and then immediately walks away, or
+  deliberately sends packets in weird combinations (`FIN`, `PSH+URG`, no flags
+  at all) that a normal program would never send.
+- **pcap** is just a file format for recorded packets. Wireshark and tcpdump
+  read and write it.
+
+Different Nmap flags produce different packets. That is why one detector can
+tell them apart: it is not guessing from timing, it is reading the flags.
+
 ## What it detects
 
-| Technique | Nmap flag | Packet signature used | Evidence produced |
+| Technique | Nmap flag | What the packets look like | What scanwatch reports |
 |---|---|---|---|
-| TCP SYN scan | `-sS` | bare `SYN` to many ports, handshake never completed | SYN count, RST/SYN+ACK ratio, constant 1024 window |
-| TCP connect scan | `-sT` | completed 3-way handshakes, closed without data | listening ports, handshake/close sequence |
-| TCP FIN scan | `-sF` | `FIN` with no ACK to ports with no connection | RST responses, port list |
-| TCP XMAS scan | `-sX` | `FIN+PSH+URG` | "Christmas tree" flag evidence |
-| TCP NULL scan | `-sN` | flag byte `0x00` | zero-flag segments |
-| TCP ACK scan | `-sA` | `ACK` only, no prior handshake | ACK segment count, RST replies |
-| TCP Maimon scan | `-sM` | `FIN+ACK`, no prior handshake | FIN+ACK segments |
-| UDP scan | `-sU` | UDP datagrams to many ports | ICMP port-unreachable attribution |
-| Service/version detection | `-sV` | application data after a completed handshake on 3+ ports | probe byte/segment counts |
-| OS fingerprinting | `-O` | illegal combinations (`SYN+FIN`, `SYN+RST`, ECN probes) | flag combinations observed |
-| Host discovery sweep | `-sn` | ICMP echo/timestamp to many hosts | host count and sample |
-| Horizontal port sweep | — | one port probed across many hosts | port, host count, sample |
+| TCP SYN scan | `-sS` | bare `SYN` to many ports, handshake never finishes | SYN count, how many got RST vs SYN+ACK, the constant 1024 window |
+| TCP connect scan | `-sT` | full handshakes, then closed without sending data | which ports were open, the handshake-then-close pattern |
+| TCP FIN scan | `-sF` | `FIN` with no `ACK`, no connection ever started | RST replies, port list |
+| TCP XMAS scan | `-sX` | `FIN+PSH+URG` set together (hence "Christmas tree") | the flag combination |
+| TCP NULL scan | `-sN` | no flags at all (flag byte `0x00`) | zero-flag segments |
+| TCP ACK scan | `-sA` | `ACK` only, with no handshake before it | ACK count, RST replies |
+| TCP Maimon scan | `-sM` | `FIN+ACK`, again with no handshake first | FIN+ACK segments |
+| UDP scan | `-sU` | UDP datagrams fired at many ports | which ICMP "port unreachable" replies came back |
+| Version detection | `-sV` | sends real application data after connecting, on several ports | how many ports got probe data |
+| OS fingerprinting | `-O` | deliberately invalid flag combos (`SYN+FIN`, `SYN+RST`, odd ECN packets) | the exact combos seen |
+| Host sweep | `-sn` | ICMP echo/timestamp to many machines | how many hosts, and which |
+| Horizontal sweep | — | the *same* port probed across many machines | the port, host count, samples |
 
-Each finding carries a `confidence` (evidence volume × signature purity × target
-responsiveness) and a `severity` derived from how many ports/hosts were touched.
+Every finding comes with a `confidence` score (how much evidence there is, how
+clean the pattern is, and whether the target answered at all) and a `severity`
+based on how many ports or hosts were involved. A scan of 400 ports reads very
+differently from a scan of 20.
 
 ## How it works
 
@@ -54,73 +100,91 @@ pcap/pcapng ──► pcapio ──► tracker ──► detectors ──► rep
                 (DPKT)     (sessions)   (rules)       (text/JSON)
 ```
 
-1. **`scanwatch/pcapio.py`** decodes Ethernet, Linux SLL/SLL2, BSD loopback,
-   raw IP and VLAN-tagged frames into flat `Packet` records. Bad frames are
-   counted and skipped, not fatal.
-2. **`scanwatch/tracker.py`** builds per-`(scanner, target)` **scan sessions**,
-   split by idle gaps, and tracks state per probed port: SYN/SYN+ACK, completed
-   handshakes, RSTs from each side, scanner payload, and ICMP unreachables.
-   Separating probes from responses (and from legitimate connection teardown)
-   is what keeps normal traffic from looking like a scan.
-3. **`scanwatch/detectors.py`** applies one rule per technique, then merges
-   repeated detections of the same flow.
-4. **`scanwatch/report.py` / `cli.py`** render text or JSON.
+1. **`scanwatch/pcapio.py`** opens the capture with DPKT and turns each frame
+   into a plain, flat record. It handles the usual link layers so you do not
+   need to care whether the capture came from Ethernet, a Linux `any`
+   interface, a BSD loopback or a VLAN. Damaged frames are counted and skipped
+   rather than crashing the run.
+2. **`scanwatch/tracker.py`** is where most of the thinking happens. It groups
+   traffic into sessions per (scanner, target) pair, splits them when there is a
+   long idle gap, and keeps per-port state: did we see `SYN`, did we see a
+   `SYN+ACK`, did the handshake finish, did someone send `RST`, did the scanner
+   send data afterwards. Keeping *probes* separate from *responses* is the whole
+   trick — it is what stops normal web browsing from looking like a scan.
+3. **`scanwatch/detectors.py`** holds one small rule per technique and merges
+   duplicate hits for the same flow into a single finding.
+4. **`scanwatch/report.py`** and **`cli.py`** print the result, either as nicely
+   formatted text or as JSON for other tools.
 
 ## Install
 
 ```bash
 pip install -r requirements.txt      # dpkt
-# or install the package and its `scanwatch` command
+# or install the package and get a `scanwatch` command
 pip install -e .
-# optional, for the tests
+# optional, only needed for the tests
 pip install pytest
 ```
 
-Analysis is pure Python and cross-platform. The live validation lab (below)
-needs **Windows + Npcap**, which ships with the Nmap Windows installer.
+Analysing captures is pure Python, so it works on Windows, macOS and Linux.
+
+Running the live lab (further down) is a different story: it captures packets
+from the machine it runs on, which on Windows means **Npcap** — that ships with
+the Nmap Windows installer, so installing Nmap usually gets you both.
 
 ## Usage
 
 ```bash
-# analyse one or more captures
+# one capture
 python -m scanwatch analyze capture.pcap
-python -m scanwatch analyze captures/real/*.pcap
-python -m scanwatch analyze capture.pcapng --json
-python -m scanwatch analyze capture.pcap --fail-on-findings   # exit 1 when detections exist
 
-# tune the rules
+# several at once, prints a report per file
+python -m scanwatch analyze captures/real/*.pcap
+
+# machine-readable output
+python -m scanwatch analyze capture.pcapng --json
+
+# exit code 1 if anything was found, handy in a script or CI job
+python -m scanwatch analyze capture.pcap --fail-on-findings
+
+# make the rules stricter or looser
 python -m scanwatch analyze capture.pcap --min-ports 30 --session-gap 60
 ```
 
-| Option | Default | Meaning |
+| Option | Default | What it does |
 |---|---|---|
-| `--min-ports` | 15 | distinct ports required for a port-scan finding |
-| `--min-hosts` | 5 | distinct hosts required for a sweep finding |
-| `--min-connect-ports` | 3 | completed handshakes required to call `-sT` |
-| `--min-version-ports` | 3 | ports with post-handshake data required for `-sV` |
-| `--min-udp-ports` | 25 | distinct ports required for `-sU` |
-| `--session-gap` | 30 s | idle gap that starts a new scan session |
+| `--min-ports` | 15 | how many different ports before we call it a port scan |
+| `--min-hosts` | 5 | how many different hosts before we call it a sweep |
+| `--min-connect-ports` | 3 | completed handshakes needed to call something `-sT` |
+| `--min-version-ports` | 3 | ports that must receive app data to call something `-sV` |
+| `--min-udp-ports` | 25 | how many UDP ports before we call it `-sU` |
+| `--session-gap` | 30 s | a pause this long starts a new scan session |
 
-JSON findings contain `technique`, `severity`, `confidence`, `scanner`, `target`,
-`ports`, `sessions`, `start`, `end` and the `evidence` lines.
+The JSON output contains `title`, `technique`, `severity`, `confidence`,
+`scanner`, `target`, `ports`, `sessions`, `start`, `end` and the `evidence`
+lines — the same information as the text report.
 
-## Validating with real Nmap traffic
+## Checking it against real Nmap traffic
 
-`tools/nmap_lab.py` runs actual Nmap scans against **this host**, captures them
-with Npcap, saves each capture, analyses it, and compares the result with the
-expected technique:
+This is the part I would want to see if I were reading someone else's project.
+`tools/nmap_lab.py` does not fake anything: it runs **real Nmap** against this
+machine, captures the traffic with Npcap, analyses the capture, and compares the
+result against the technique it asked Nmap to perform.
 
 ```bash
-python tools/nmap_lab.py                  # full run, default target 127.0.0.1
-python tools/nmap_lab.py --only syn_scan  # one scenario
+python tools/nmap_lab.py                  # all scenarios, target 127.0.0.1
+python tools/nmap_lab.py --only syn_scan  # just one
 ```
 
-It opens eight fake services on ports 20001–20008 so that `-sT`, `-sV` and the
-open-port branches of `-sS` have something real to talk to. The services emit a
-banner Nmap cannot identify, so `-sV` actually sends its probe payloads instead
-of short-circuiting on a recognised banner.
+To give the scans something to find, the script starts eight small fake
+services on ports 20001–20008. That matters for `-sT` (cancel scans need open
+ports to connect to) and for `-sV` (version detection has to have something to
+talk to). The fake services reply with a banner Nmap cannot identify, which
+keeps it probing and actually sending its payload — with a real-looking SSH or
+HTTP banner, Nmap recognises the service immediately and sends nothing, and the
+test ends up proving very little.
 
-Outputs:
+It writes:
 
 ```
 captures/real/<scenario>.pcap       the raw capture
@@ -128,7 +192,7 @@ captures/real/<scenario>.nmap.txt   the exact nmap command and its output
 captures/real/validation.json       expected vs detected, per scenario
 ```
 
-Measured with Nmap 7.98 (Npcap 1.87, Windows loopback), full run:
+Results from a full run (Nmap 7.98, Npcap 1.87, Windows loopback):
 
 | Scenario | Expected | Detected | Verdict |
 |---|---|---|---|
@@ -143,17 +207,31 @@ Measured with Nmap 7.98 (Npcap 1.87, Windows loopback), full run:
 | `version_scan` | version | version | PASS |
 | `os_fingerprint` | syn + os_fingerprint | syn + os_fingerprint | PASS |
 
-**10/10 scenarios, 100% technique recall, 100% precision (11/11 expected
-techniques, 0 extra findings).** `-O` legitimately produces both a SYN port
-scan and fingerprint probes, so both are expected.
+That is **10/10 scenarios, 100% of the expected techniques found, and 0 extra
+findings**. The two-technique row is not a mistake: `-O` really does perform a
+SYN scan first and then start fingerprinting, so both answers are correct.
 
-## Offline fixtures
+Worth saying plainly: these are loopback captures on one machine. It is a
+controlled test, not a live network, and the limitations section below covers
+where that matters.
 
-`python -m scanwatch synth samples` writes 15 labelled captures that reproduce
-Nmap's wire signatures (including two benign traffic captures that must produce
-no findings), plus `samples/labels.json`. These are **synthetic**; they exist so
-the detector can be tested on machines without Nmap or a capture driver. The
-real-traffic numbers above come from the lab, not from these files.
+## Ready-made sample captures
+
+If you do not have Nmap installed, or cannot capture packets on your machine,
+there are samples:
+
+```bash
+python -m scanwatch synth samples
+```
+
+This writes 15 labelled captures that reproduce the same packet signatures,
+plus `samples/labels.json` telling you what each one should produce. Three of
+them are ordinary traffic — a web session, DNS lookups and some UDP service
+discovery — and should produce **no** findings at all. Those exist to catch a
+detector that flags everything.
+
+These files are **synthetic**. They are convenient for testing on any machine,
+but the accuracy numbers above came from the real Nmap lab, not from them.
 
 ## Tests
 
@@ -161,58 +239,61 @@ real-traffic numbers above come from the lab, not from these files.
 python -m pytest
 ```
 
-25 tests: one end-to-end detection assertion per labelled capture (including
-false-positive guards for HTTP, DNS and UDP service-discovery traffic), parser
-tests for pcap and
-`DLT_NULL` loopback captures, truncated-frame handling, and TCP flag
-classification tests.
+25 tests: one end-to-end assertion per labelled sample (including the
+false-positive guards for HTTP, DNS and UDP discovery traffic), parser tests for
+pcap files and loopback (`DLT_NULL`) captures, handling of truncated frames, and
+tests for the TCP flag classification itself.
 
 ## Limitations
 
-- **`-sS` vs `-sT` on a host with no open ports.** A connect scan to closed
-  ports produces bare SYNs and RSTs, exactly like a SYN scan. Completed
-  handshakes are the only distinguishing evidence, so with fewer than
-  `--min-connect-ports` open ports a connect scan is reported as a SYN scan.
-- **Single-port `-sV`** looks like a client talking to one service and is not
-  flagged; version detection requires probes across 3+ ports.
-- **UDP scans** are detected by port fan-out. ICMP rate limiting can hide the
-  port-unreachable replies, which lowers confidence but not detection. The bar
-  is 25 distinct ports: shorter bursts (service discovery, mDNS-style chatter)
-  are not flagged. Real `-sU` runs touch hundreds of ports, so this leaves a
-  wide margin; lower `--min-udp-ports` if you need to catch tiny sweeps.
-- **`-O`** is detected from illegal flag combinations; a stack that answers only
-  the well-formed fingerprint probes may not be identified.
-- **Not implemented:** idle scan (`-sI`), decoys (`-D`), fragmentation (`-f`,
-  `--mtu`), IP-ID analysis, and application-layer parsing.
-- **IPv4 first.** IPv6 packets are parsed, but ICMPv6 quoted packets are not used
-  for UDP/TCP response attribution.
-- **Lab scope.** All accuracy figures are from loopback captures of Nmap traffic
-  and synthetic fixtures. On a switched production network you may only see one
-  direction of a scan, which lowers evidential confidence (reported explicitly in
-  the finding as "scan may be filtered or captured one-way").
-- The lab's live-capture path is Windows/Npcap only; the analyzer itself runs
-  anywhere Python and DPKT do.
+I would rather list these than have someone find them the hard way.
+
+- **A connect scan against a host with no open ports looks exactly like a SYN
+  scan.** Both send a bare `SYN` and get `RST` back. The only way to tell them
+  apart is a completed handshake, so if fewer than `--min-connect-ports` ports
+  are open, a `-sT` scan gets reported as `-sS`. This is the honest weak spot.
+- **Version detection against a single port** looks like a normal client talking
+  to one service, so it is not flagged. It takes probes to 3+ ports.
+- **UDP scanning** is judged by how many ports get hit. That bar is 25, because
+  ordinary background traffic (service discovery, mDNS-style chatter) produces
+  short bursts that should not be called an attack — I saw exactly that happen
+  during testing at a threshold of 10. Real `-sU` runs touch hundreds of ports,
+  so there is plenty of margin; lower `--min-udp-ports` if you need to catch
+  tiny sweeps and can tolerate more noise.
+- **OS fingerprinting** is spotted from the invalid flag combinations it sends.
+  A hardened stack that quietly drops those probes will not be identified.
+- **Not implemented:** idle scans (`-sI`), decoys (`-D`), fragmentation
+  (`-f`/`--mtu`), IP-ID analysis, and any application-layer parsing.
+- **IPv4 comes first.** IPv6 packets are decoded, but ICMPv6 replies are not
+  used to attribute UDP/TCP responses yet.
+- **One direction only.** On a switched network you may only see the scanner's
+  side of the conversation. The tool still reports the finding but lowers
+  confidence and says so in the evidence ("scan may be filtered or captured
+  one-way").
+- **The live lab is Windows/Npcap only.** The analyser itself is not.
 
 ## Project layout
 
 ```
 scanwatch/
-  pcapio.py      DPKT capture decoding (pcap, pcapng, Ethernet/SLL/loopback)
+  pcapio.py      capture decoding: pcap, pcapng, Ethernet/SLL/loopback (DPKT)
   tracker.py     per-(scanner,target) sessions, handshake and response state
-  probes.py      TCP flag byte -> Nmap probe kind
-  detectors.py   one rule per technique + confidence/severity scoring
-  report.py      text and JSON rendering
-  cli.py         analyze / synth commands
-  synth.py       labelled synthetic Nmap captures
+  probes.py      TCP flag byte -> which kind of Nmap probe it is
+  detectors.py   one rule per technique plus confidence/severity scoring
+  report.py      text and JSON output
+  cli.py         the analyze and synth commands
+  synth.py       generates the labelled sample captures
 tools/
-  npcap_capture.py  ctypes binding for Npcap live capture
-  nmap_lab.py       generate real Nmap traffic and score the detector
-samples/           15 synthetic labelled captures + labels.json
+  npcap_capture.py  live packet capture through Npcap (ctypes, no extra deps)
+  nmap_lab.py       runs real Nmap, captures it, scores the detector
+samples/           15 labelled synthetic captures + labels.json
 captures/real/     real Nmap captures, nmap logs, validation.json
 tests/
 ```
 
 ## Legal
 
-Use only against hosts you own or are explicitly authorised to test. The lab
-refuses any target that is not loopback or RFC1918-private.
+Only use this against hosts you own or have written permission to test. Scanning
+someone else's network is illegal in most places, even if you mean no harm. The
+lab script refuses any target that is not loopback or a private (RFC1918)
+address, so you cannot accidentally point it at a stranger's machine.
